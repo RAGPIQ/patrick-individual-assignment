@@ -14,9 +14,7 @@
       --card: #f8fafc;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     html, body {
       margin: 0;
@@ -94,18 +92,12 @@
     }
 
     @media (max-width: 980px) {
-      main {
-        grid-template-columns: 1fr;
-      }
+      main { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 500px) {
-      .panel {
-        padding: 12px;
-      }
-      header h1 {
-        font-size: 16px;
-      }
+      .panel { padding: 12px; }
+      header h1 { font-size: 16px; }
     }
   </style>
 </head>
@@ -124,17 +116,12 @@
       <h2>Controls</h2>
       <div class="row"><label>Land area (Ha):</label><span id="haVal">350</span></div>
       <input type="range" id="ha" min="100" max="550" step="50" value="350" />
-
-      <div class="row"><label>Total Fixed Cost (TFC):</label><span id="tfcVal">$682,000</span></div>
-      <input type="range" id="tfc" min="300000" max="1500000" step="10000" value="682000" />
-
-      <div class="row"><label>AVC Multiplier:</label><span id="multVal">1.00×</span></div>
-      <input type="range" id="mult" min="0.5" max="2.0" step="0.01" value="1.0" />
     </section>
   </main>
 
   <footer>
-    Displays Average Fixed, Variable, Total, and Marginal Costs per Litre of output, across Ha range 100–550. Sliders control Total Fixed Cost (TFC) and AVC multiplier for recalculating curves dynamically.
+    Displays Average Fixed, Variable, Total, and Marginal Costs per Litre of output, across Ha range 100–550.
+    The orange horizontal marker tracks the selected land area.
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -142,14 +129,14 @@
     const HAs = [100,150,200,250,300,350,400,450,500,550];
     const AVCs = {100:1.870,150:1.458,200:1.094,250:1.171,300:1.289,350:1.377,400:1.783,450:2.601,500:3.526,550:7.054};
     const outputs = HAs.map(h => h * 2970);
+    const TFC = 682000;
 
-    const haSlider = document.getElementById('ha'), haVal = document.getElementById('haVal');
-    const tfcSlider = document.getElementById('tfc'), tfcVal = document.getElementById('tfcVal');
-    const multSlider = document.getElementById('mult'), multVal = document.getElementById('multVal');
+    const haSlider = document.getElementById('ha');
+    const haVal = document.getElementById('haVal');
 
-    function compute(TFC, mult) {
+    function compute() {
       const AFC = outputs.map(Q => TFC / Q);
-      const AVC = HAs.map(h => AVCs[h] * mult);
+      const AVC = HAs.map(h => AVCs[h]);
       const ATC = AFC.map((a, i) => a + AVC[i]);
       const MC = [AVC[0], ...AVC.slice(1).map((v, i) => {
         const dTVC = (outputs[i + 1] * AVC[i + 1] - outputs[i] * AVC[i]);
@@ -159,9 +146,8 @@
       return { AFC, AVC, ATC, MC };
     }
 
-    let TFC = 682000, mult = 1.0;
+    const { AFC, AVC, ATC, MC } = compute();
     const ctx = document.getElementById('chart').getContext('2d');
-    const { AFC, AVC, ATC, MC } = compute(TFC, mult);
 
     const chart = new Chart(ctx, {
       type: 'line',
@@ -177,10 +163,14 @@
       options: {
         responsive: true,
         maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { position: 'bottom' },
           tooltip: {
+            mode: 'index',
+            intersect: false,
             callbacks: {
+              title: ctx => `Land Area: ${ctx[0].label}`,
               label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(3)}/L`
             }
           }
@@ -190,32 +180,36 @@
             title: { display: true, text: 'Cost ($/L)' },
             grid: { color: 'rgba(0,0,0,0.06)' }
           },
-          x: {
-            grid: { color: 'rgba(0,0,0,0.04)' }
-          }
+          x: { grid: { color: 'rgba(0,0,0,0.04)' } }
         }
-      }
+      },
+      plugins: [{
+        id: 'haMarker',
+        afterDatasetsDraw(chart) {
+          const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+          const ha = parseInt(haSlider.value);
+          const idx = HAs.indexOf(ha);
+          if (idx < 0) return;
+          const xPos = x.getPixelForValue(idx);
+          ctx.save();
+          ctx.strokeStyle = '#ef7d00';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 4]);
+          ctx.beginPath();
+          ctx.moveTo(xPos, top);
+          ctx.lineTo(xPos, bottom);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }]
     });
 
-    function recompute() {
-      TFC = parseInt(tfcSlider.value);
-      mult = parseFloat(multSlider.value);
-      const { AFC, AVC, ATC, MC } = compute(TFC, mult);
-
-      chart.data.datasets[0].data = AFC;
-      chart.data.datasets[1].data = AVC;
-      chart.data.datasets[2].data = ATC;
-      chart.data.datasets[3].data = MC;
-      chart.update();
-
+    function updateMarker() {
       haVal.textContent = haSlider.value;
-      tfcVal.textContent = '$' + parseInt(tfcSlider.value).toLocaleString('en-AU');
-      multVal.textContent = mult.toFixed(2) + '×';
+      chart.update();
     }
 
-    haSlider.addEventListener('input', recompute);
-    tfcSlider.addEventListener('input', recompute);
-    multSlider.addEventListener('input', recompute);
+    haSlider.addEventListener('input', updateMarker);
   </script>
 </body>
 </html>
