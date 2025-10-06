@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>OJI Cost Curves — Q2a Simulator</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #0f172a;
+      --muted: #6b7280;
+      --accent: #ef7d00;
+      --grid: #e5e7eb;
+      --card: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+      background: var(--bg);
+      color: var(--fg);
+      overflow-x: hidden;
+    }
+
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--grid);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: clamp(16px, 2vw, 18px);
+      margin: 0;
+      letter-spacing: 0.2px;
+    }
+
+    header .sub {
+      color: var(--muted);
+      font-size: clamp(12px, 1.5vw, 13px);
+    }
+
+    main {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--grid);
+      border-radius: 14px;
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: clamp(14px, 1.8vw, 16px);
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    .control {
+      display: grid;
+      gap: 6px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .badge {
+      background: #fff;
+      border: 1px solid var(--grid);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: clamp(11px, 1.5vw, 12px);
+      white-space: nowrap;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .kpi {
+      background: #fff;
+      border: 1px solid var(--grid);
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .kpi .label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .kpi .value {
+      font-size: 16px;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    footer {
+      padding: 8px 20px 20px;
+      color: var(--muted);
+      font-size: clamp(11px, 1.5vw, 12px);
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    canvas {
+      background: #fff;
+      border: 1px solid var(--grid);
+      border-radius: 12px;
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 16 / 9;
+    }
+
+    .note {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        flex-direction: column;
+      }
+
+      .badges {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 500px) {
+      .panel {
+        padding: 12px;
+      }
+
+      .badge {
+        font-size: 11px;
+        padding: 5px 8px;
+      }
+
+      .note {
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>Orange Juice Incorporated — Cost Curves (Q2a)</h1>
+      <div class="sub">Total Cost vs Total Variable Cost vs Total Fixed Cost</div>
+    </div>
+    <div class="badges">
+      <span class="badge">Price (wholesale): $4.63/L</span>
+      <span class="badge">Yield: 2,970 L/Ha</span>
+      <span class="badge">Trees: 300/Ha</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Chart</h2>
+      <canvas id="chart"></canvas>
+      <div class="note">Note: Points are plotted at 100–550 Ha (50 Ha steps). Sliders update the vertical marker and
+        re-compute values.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Controls</h2>
+      <div class="controls">
+        <div class="control">
+          <div class="row">
+            <label for="ha">Land area (Ha)</label>
+            <div id="haVal">350</div>
+          </div>
+          <input id="ha" type="range" min="100" max="550" step="50" value="350" />
+        </div>
+
+        <div class="control">
+          <div class="row">
+            <label for="tfc">Total fixed cost (TFC)</label>
+            <div id="tfcVal">$682,000</div>
+          </div>
+          <input id="tfc" type="range" min="300000" max="1500000" step="10000" value="682000" />
+        </div>
+
+        <div class="control">
+          <div class="row">
+            <label for="avcMult">AVC multiplier</label>
+            <div id="avcVal">1.00×</div>
+          </div>
+          <input id="avcMult" type="range" min="0.50" max="2.00" step="0.01" value="1.00" />
+        </div>
+
+        <div class="kpis">
+          <div class="kpi">
+            <div class="label">Output Q (L)</div>
+            <div class="value" id="qOut">—</div>
+          </div>
+          <div class="kpi">
+            <div class="label">AVC (at Ha) $/L</div>
+            <div class="value" id="avcOut">—</div>
+          </div>
+          <div class="kpi">
+            <div class="label">TVC ($)</div>
+            <div class="value" id="tvcOut">—</div>
+          </div>
+          <div class="kpi">
+            <div class="label">TC ($)</div>
+            <div class="value" id="tcOut">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Data assumptions: Trees/Ha = 300; Fruit/Tree = 33 kg; Juice yield = 0.30 L/kg ⇒ 2,970 L/Ha. AVC schedule varies with
+    Ha as per provided table. This tool displays TC = TFC + TVC, with TVC = Q × AVC(Ha) × multiplier.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    const HAs = [100, 150, 200, 250, 300, 350, 400, 450, 500, 550];
+    const AVC = {
+      100: 1.870,
+      150: 1.458,
+      200: 1.094,
+      250: 1.171,
+      300: 1.289,
+      350: 1.377,
+      400: 1.783,
+      450: 2.601,
+      500: 3.526,
+      550: 7.054
+    };
+    const L_PER_HA = 2970;
+
+    const haEl = document.getElementById('ha');
+    const haVal = document.getElementById('haVal');
+    const tfcEl = document.getElementById('tfc');
+    const tfcVal = document.getElementById('tfcVal');
+    const avcMultEl = document.getElementById('avcMult');
+    const avcVal = document.getElementById('avcVal');
+    const qOut = document.getElementById('qOut');
+    const avcOut = document.getElementById('avcOut');
+    const tvcOut = document.getElementById('tvcOut');
+    const tcOut = document.getElementById('tcOut');
+
+    function formatMoney(n) {
+      return n.toLocaleString('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 });
+    }
+
+    function formatNumber(n) {
+      return n.toLocaleString('en-AU', { maximumFractionDigits: 0 });
+    }
+
+    function calcSeries(TFC, mult) {
+      const Q = HAs.map(ha => ha * L_PER_HA);
+      const TVC = HAs.map((ha, i) => Q[i] * AVC[ha] * mult);
+      const TC = TVC.map(v => v + TFC);
+      return { Q, TVC, TC };
+    }
+
+    let TFC = 682000;
+    let mult = 1.00;
+    const base = calcSeries(TFC, mult);
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: HAs.map(h => h + ' Ha'),
+        datasets: [
+          { label: 'Total Fixed Cost (TFC)', data: HAs.map(_ => TFC), borderWidth: 2, tension: 0.25 },
+          { label: 'Total Variable Cost (TVC)', data: base.TVC, borderWidth: 2, tension: 0.25 },
+          { label: 'Total Cost (TC)', data: base.TC, borderWidth: 2, tension: 0.25 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: { label: ctx => `${ctx.dataset.label}: ${formatMoney(ctx.parsed.y)}` }
+          }
+        },
+        scales: {
+          y: {
+            title: { display: true, text: 'Cost ($)' },
+            grid: { color: 'rgba(0,0,0,0.06)' },
+            ticks: { callback: (v) => formatMoney(v) }
+          },
+          x: { grid: { color: 'rgba(0,0,0,0.04)' } }
+        }
+      }
+    });
+
+    const marker = {
+      id: 'marker',
+      afterDatasetsDraw(chart) {
+        const { ctx, chartArea, scales: { x } } = chart;
+        const ha = parseInt(haEl.value, 10);
+        const idx = HAs.indexOf(ha);
+        if (idx < 0) return;
+        const xPos = x.getPixelForValue(idx);
+        ctx.save();
+        ctx.strokeStyle = '#ef7d00';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(xPos, chartArea.top);
+        ctx.lineTo(xPos, chartArea.bottom);
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+    Chart.register(marker);
+
+    function updateUI() {
+      const ha = parseInt(haEl.value, 10);
+      const TFCv = parseInt(tfcEl.value, 10);
+      const multv = parseFloat(avcMultEl.value);
+      haVal.textContent = ha;
+      tfcVal.textContent = formatMoney(TFCv);
+      avcVal.textContent = multv.toFixed(2) + '×';
+
+      const Q = ha * L_PER_HA;
+      const avcAtHa = AVC[ha] * multv;
+      const TVC = Q * avcAtHa;
+      const TC = TFCv + TVC;
+      qOut.textContent = formatNumber(Q);
+      avcOut.textContent = '$' + avcAtHa.toFixed(3) + '/L';
+      tvcOut.textContent = formatMoney(TVC);
+      tcOut.textContent = formatMoney(TC);
+    }
+
+    function recompute() {
+      const TFCv = parseInt(tfcEl.value, 10);
+      const multv = parseFloat(avcMultEl.value);
+      const s = calcSeries(TFCv, multv);
+      chart.data.datasets[0].data = HAs.map(_ => TFCv);
+      chart.data.datasets[1].data = s.TVC;
+      chart.data.datasets[2].data = s.TC;
+      chart.update();
+      updateUI();
+    }
+
+    haEl.addEventListener('input', updateUI);
+    tfcEl.addEventListener('input', recompute);
+    avcMultEl.addEventListener('input', recompute);
+
+    updateUI();
+  </script>
+</body>
+
+</html>
