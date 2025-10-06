@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>OJI Cost Curves — Q2b Simulator</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #0f172a;
+      --muted: #6b7280;
+      --accent: #ef7d00;
+      --grid: #e5e7eb;
+      --card: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+    }
+
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--grid);
+    }
+
+    header h1 {
+      font-size: clamp(16px, 2vw, 18px);
+      margin: 0;
+      letter-spacing: 0.2px;
+    }
+
+    main {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--grid);
+      border-radius: 14px;
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: clamp(14px, 1.8vw, 16px);
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+
+    canvas {
+      background: #fff;
+      border: 1px solid var(--grid);
+      border-radius: 12px;
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 16 / 9;
+    }
+
+    footer {
+      padding: 8px 20px 20px;
+      color: var(--muted);
+      font-size: clamp(11px, 1.5vw, 12px);
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 500px) {
+      .panel {
+        padding: 12px;
+      }
+      header h1 {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OJI Cost Curves — Average and Marginal Costs (Q2b)</h1>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Chart</h2>
+      <canvas id="chart"></canvas>
+    </section>
+
+    <section class="panel">
+      <h2>Controls</h2>
+      <div class="row"><label>Land area (Ha):</label><span id="haVal">350</span></div>
+      <input type="range" id="ha" min="100" max="550" step="50" value="350" />
+
+      <div class="row"><label>Total Fixed Cost (TFC):</label><span id="tfcVal">$682,000</span></div>
+      <input type="range" id="tfc" min="300000" max="1500000" step="10000" value="682000" />
+
+      <div class="row"><label>AVC Multiplier:</label><span id="multVal">1.00×</span></div>
+      <input type="range" id="mult" min="0.5" max="2.0" step="0.01" value="1.0" />
+    </section>
+  </main>
+
+  <footer>
+    Displays Average Fixed, Variable, Total, and Marginal Costs per Litre of output, across Ha range 100–550. Sliders control Total Fixed Cost (TFC) and AVC multiplier for recalculating curves dynamically.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const HAs = [100,150,200,250,300,350,400,450,500,550];
+    const AVCs = {100:1.870,150:1.458,200:1.094,250:1.171,300:1.289,350:1.377,400:1.783,450:2.601,500:3.526,550:7.054};
+    const outputs = HAs.map(h => h * 2970);
+
+    const haSlider = document.getElementById('ha'), haVal = document.getElementById('haVal');
+    const tfcSlider = document.getElementById('tfc'), tfcVal = document.getElementById('tfcVal');
+    const multSlider = document.getElementById('mult'), multVal = document.getElementById('multVal');
+
+    function compute(TFC, mult) {
+      const AFC = outputs.map(Q => TFC / Q);
+      const AVC = HAs.map(h => AVCs[h] * mult);
+      const ATC = AFC.map((a, i) => a + AVC[i]);
+      const MC = [AVC[0], ...AVC.slice(1).map((v, i) => {
+        const dTVC = (outputs[i + 1] * AVC[i + 1] - outputs[i] * AVC[i]);
+        const dQ = outputs[i + 1] - outputs[i];
+        return dTVC / dQ;
+      })];
+      return { AFC, AVC, ATC, MC };
+    }
+
+    let TFC = 682000, mult = 1.0;
+    const ctx = document.getElementById('chart').getContext('2d');
+    const { AFC, AVC, ATC, MC } = compute(TFC, mult);
+
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: HAs.map(h => h + ' Ha'),
+        datasets: [
+          { label: 'Average Fixed Cost (AFC)', data: AFC, borderColor: '#3b82f6', borderWidth: 2, tension: 0.25 },
+          { label: 'Average Variable Cost (AVC)', data: AVC, borderColor: '#ef7d00', borderWidth: 2, tension: 0.25 },
+          { label: 'Average Total Cost (ATC)', data: ATC, borderColor: '#22c55e', borderWidth: 2, tension: 0.25 },
+          { label: 'Marginal Cost (MC)', data: MC, borderColor: '#f43f5e', borderWidth: 2, borderDash: [6, 4], tension: 0.25 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(3)}/L`
+            }
+          }
+        },
+        scales: {
+          y: {
+            title: { display: true, text: 'Cost ($/L)' },
+            grid: { color: 'rgba(0,0,0,0.06)' }
+          },
+          x: {
+            grid: { color: 'rgba(0,0,0,0.04)' }
+          }
+        }
+      }
+    });
+
+    function recompute() {
+      TFC = parseInt(tfcSlider.value);
+      mult = parseFloat(multSlider.value);
+      const { AFC, AVC, ATC, MC } = compute(TFC, mult);
+
+      chart.data.datasets[0].data = AFC;
+      chart.data.datasets[1].data = AVC;
+      chart.data.datasets[2].data = ATC;
+      chart.data.datasets[3].data = MC;
+      chart.update();
+
+      haVal.textContent = haSlider.value;
+      tfcVal.textContent = '$' + parseInt(tfcSlider.value).toLocaleString('en-AU');
+      multVal.textContent = mult.toFixed(2) + '×';
+    }
+
+    haSlider.addEventListener('input', recompute);
+    tfcSlider.addEventListener('input', recompute);
+    multSlider.addEventListener('input', recompute);
+  </script>
+</body>
+</html>
